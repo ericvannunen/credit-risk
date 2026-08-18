@@ -58,9 +58,15 @@ class SmallRiskNet(nn.Module):
 @dataclass
 class TrainedModels:
     logistic_pipeline: Pipeline
-    nn_scaler: StandardScaler
+    nn_preprocessor: "NNPreprocessor"
     nn_model: SmallRiskNet
     feature_names: List[str]
+
+
+@dataclass
+class NNPreprocessor:
+    imputer: SimpleImputer
+    scaler: StandardScaler
 
 
 def _download_and_extract(data_dir: Path) -> Path:
@@ -96,7 +102,7 @@ def _parse_arff(arff_path: Path) -> Tuple[np.ndarray, np.ndarray, List[str]]:
             lowered = line.lower()
             if lowered.startswith("@attribute") and not in_data:
                 parts = line.split()
-                if len(parts) >= 2 and parts[1] != "class":
+                if len(parts) >= 2 and parts[1].lower() != "class":
                     feature_names.append(parts[1])
                 continue
             if lowered.startswith("@data"):
@@ -168,7 +174,7 @@ def _fit_neural_network(
     y_train: np.ndarray,
     epochs: int = 80,
     learning_rate: float = 1e-3,
-) -> Tuple[StandardScaler, SmallRiskNet]:
+) -> Tuple[NNPreprocessor, SmallRiskNet]:
     imputer = SimpleImputer(strategy="median")
     X_train_imp = imputer.fit_transform(X_train)
 
@@ -194,14 +200,12 @@ def _fit_neural_network(
         loss.backward()
         optimizer.step()
 
-    scaler._creditrisk_imputer = imputer  # type: ignore[attr-defined]
-    return scaler, model
+    return NNPreprocessor(imputer=imputer, scaler=scaler), model
 
 
-def _nn_predict_proba(model: SmallRiskNet, scaler: StandardScaler, X: np.ndarray) -> np.ndarray:
-    imputer: SimpleImputer = scaler._creditrisk_imputer  # type: ignore[attr-defined]
-    X_imp = imputer.transform(X)
-    X_scaled = scaler.transform(X_imp)
+def _nn_predict_proba(model: SmallRiskNet, preprocessor: NNPreprocessor, X: np.ndarray) -> np.ndarray:
+    X_imp = preprocessor.imputer.transform(X)
+    X_scaled = preprocessor.scaler.transform(X_imp)
     x_tensor = torch.tensor(X_scaled, dtype=torch.float32)
     model.eval()
     with torch.no_grad():
@@ -227,28 +231,31 @@ def compare_models(
     logistic = _fit_logistic(X_train, y_train)
     log_probs = logistic.predict_proba(X_test)[:, 1]
 
-    nn_scaler, nn_model = _fit_neural_network(X_train, y_train)
-    nn_probs = _nn_predict_proba(nn_model, nn_scaler, X_test)
+    nn_preprocessor, nn_model = _fit_neural_network(X_train, y_train)
+    nn_probs = _nn_predict_proba(nn_model, nn_preprocessor, X_test)
+
+    logistic_auc = float(roc_auc_score(y_test, log_probs))
+    logistic_ece = float(_expected_calibration_error(y_test, log_probs))
+    nn_auc = float(roc_auc_score(y_test, nn_probs))
+    nn_ece = float(_expected_calibration_error(y_test, nn_probs))
 
     result = ComparisonResult(
-        logistic_auc=float(roc_auc_score(y_test, log_probs)),
+        logistic_auc=logistic_auc,
         logistic_brier=float(brier_score_loss(y_test, log_probs)),
-        logistic_ece=float(_expected_calibration_error(y_test, log_probs)),
-        nn_auc=float(roc_auc_score(y_test, nn_probs)),
+        logistic_ece=logistic_ece,
+        nn_auc=nn_auc,
         nn_brier=float(brier_score_loss(y_test, nn_probs)),
-        nn_ece=float(_expected_calibration_error(y_test, nn_probs)),
+        nn_ece=nn_ece,
         preferred_model=(
             "neural_net"
-            if roc_auc_score(y_test, nn_probs) > roc_auc_score(y_test, log_probs)
-            and _expected_calibration_error(y_test, nn_probs)
-            <= (_expected_calibration_error(y_test, log_probs) + 0.02)
+            if nn_auc > logistic_auc and nn_ece <= (logistic_ece + 0.02)
             else "logistic_regression"
         ),
     )
 
     trained = TrainedModels(
         logistic_pipeline=logistic,
-        nn_scaler=nn_scaler,
+        nn_preprocessor=nn_preprocessor,
         nn_model=nn_model,
         feature_names=feature_names,
     )
@@ -270,8 +277,9 @@ def prediction_explanations(models: TrainedModels, company_row: np.ndarray, top_
     logit_contrib = row_scaled[0] * clf.coef_[0]
     log_prob = float(logistic.predict_proba(company_row.reshape(1, -1))[0, 1])
 
-    nn_imputer: SimpleImputer = models.nn_scaler._creditrisk_imputer  # type: ignore[attr-defined]
-    row_nn = models.nn_scaler.transform(nn_imputer.transform(company_row.reshape(1, -1)))
+    row_nn = models.nn_preprocessor.scaler.transform(
+        models.nn_preprocessor.imputer.transform(company_row.reshape(1, -1))
+    )
     x_tensor = torch.tensor(row_nn, dtype=torch.float32, requires_grad=True)
     models.nn_model.eval()
     nn_prob_tensor = torch.sigmoid(models.nn_model(x_tensor))

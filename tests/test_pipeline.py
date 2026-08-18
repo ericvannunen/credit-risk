@@ -6,8 +6,12 @@ from credit_risk.pipeline import compare_models, grade_from_probability, predict
 def test_grade_mapping_boundaries():
     assert grade_from_probability(0.00) == "A"
     assert grade_from_probability(0.05) == "A"
+    assert grade_from_probability(0.051) == "B"
     assert grade_from_probability(0.10) == "B"
+    assert grade_from_probability(0.15) == "B"
     assert grade_from_probability(0.25) == "C"
+    assert grade_from_probability(0.30) == "C"
+    assert grade_from_probability(0.301) == "D"
     assert grade_from_probability(0.50) == "D"
     assert grade_from_probability(0.90) == "E"
 
