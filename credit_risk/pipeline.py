@@ -56,17 +56,17 @@ class SmallRiskNet(nn.Module):
 
 
 @dataclass
-class TrainedModels:
-    logistic_pipeline: Pipeline
-    nn_preprocessor: "NNPreprocessor"
-    nn_model: SmallRiskNet
-    feature_names: List[str]
-
-
-@dataclass
 class NNPreprocessor:
     imputer: SimpleImputer
     scaler: StandardScaler
+
+
+@dataclass
+class TrainedModels:
+    logistic_pipeline: Pipeline
+    nn_preprocessor: NNPreprocessor
+    nn_model: SmallRiskNet
+    feature_names: List[str]
 
 
 def _download_and_extract(data_dir: Path) -> Path:
@@ -282,6 +282,7 @@ def prediction_explanations(models: TrainedModels, company_row: np.ndarray, top_
     )
     x_tensor = torch.tensor(row_nn, dtype=torch.float32, requires_grad=True)
     models.nn_model.eval()
+    # Attribution uses local saliency (input × gradient of predicted probability).
     nn_prob_tensor = torch.sigmoid(models.nn_model(x_tensor))
     nn_prob_tensor.backward()
     nn_contrib = (x_tensor.grad.detach().numpy()[0] * row_nn[0]).astype(float)
@@ -325,4 +326,11 @@ def run_training(data_dir: str | Path = "data", data_path: str | Path | None = N
 
 
 def run_training_json(data_dir: str | Path = "data", data_path: str | Path | None = None) -> str:
-    return json.dumps(run_training(data_dir=data_dir, data_path=data_path), indent=2)
+    def _json_default(value: object) -> object:
+        if isinstance(value, np.generic):
+            return value.item()
+        if isinstance(value, np.ndarray):
+            return value.tolist()
+        raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
+
+    return json.dumps(run_training(data_dir=data_dir, data_path=data_path), indent=2, default=_json_default)
