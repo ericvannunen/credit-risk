@@ -1,5 +1,12 @@
 
 
+source .venv/bin/activate
+
 python -m credit_risk.cli --data-path data/5year.arff
 
 streamlit run credit_risk/app.py
+
+
+Search:
+
+python -m credit_risk.search --data-path data/5year.arff

@@ -4,6 +4,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import streamlit as st
 from sklearn.calibration import calibration_curve
 from sklearn.metrics import precision_recall_curve, roc_curve
@@ -12,6 +13,8 @@ from credit_risk.pipeline import (
     ComparisonResult,
     TrainedModels,
     compare_models,
+    FALSE_NEGATIVE_COST,
+    FALSE_POSITIVE_COST,
     load_polish_bankruptcy_five_year,
     prediction_explanations,
 )
@@ -21,7 +24,7 @@ st.set_page_config(page_title="Corporate Credit Risk", page_icon="📊", layout=
 
 
 @st.cache_resource(show_spinner="Training both models...")
-def train_dashboard(data_path: str) -> tuple[
+def train_dashboard(data_path: str, false_negative_cost: float, false_positive_cost: float) -> tuple[
     np.ndarray,
     np.ndarray,
     list[str],
@@ -30,7 +33,15 @@ def train_dashboard(data_path: str) -> tuple[
     dict[str, np.ndarray],
 ]:
     X, y, feature_names = load_polish_bankruptcy_five_year(data_path=Path(data_path))
-    comparison, models, holdout = compare_models(X, y, feature_names)
+    # Including the threshold in the cache key makes GUI edits recompute
+    # threshold-dependent metrics such as recall.
+    comparison, models, holdout = compare_models(
+        X,
+        y,
+        feature_names,
+        false_negative_cost=false_negative_cost,
+        false_positive_cost=false_positive_cost,
+    )
     return X, y, feature_names, comparison, models, holdout
 
 
@@ -72,7 +83,7 @@ def metric_chart(y_test: np.ndarray, predictions: dict[str, np.ndarray], chart_t
 
 
 st.title("Corporate Credit Risk")
-st.write("Compare bankruptcy predictions from logistic regression and a small neural network.")
+st.write("Compare calibrated bankruptcy predictions from logistic regression and a small neural network.")
 
 with st.sidebar:
     st.header("Data")
@@ -80,7 +91,11 @@ with st.sidebar:
     st.caption("Models train once and are cached until the app is refreshed.")
 
 try:
-    X, y, feature_names, comparison, models, holdout = train_dashboard(data_path)
+    X, y, feature_names, comparison, models, holdout = train_dashboard(
+        data_path,
+        FALSE_NEGATIVE_COST,
+        FALSE_POSITIVE_COST,
+    )
 except (FileNotFoundError, RuntimeError, ValueError) as exc:
     st.error(f"Could not load or train the models: {exc}")
     st.stop()
@@ -92,12 +107,18 @@ summary_columns[1].metric("Financial ratios", str(X.shape[1]))
 summary_columns[2].metric("Bankrupt companies", f"{int(y.sum()):,}")
 summary_columns[3].metric("Bankruptcy rate", f"{bankruptcy_rate:.1%}")
 
-st.subheader("Model comparison")
+st.subheader("Final calibrated test scores")
+st.caption(
+    "PR-AUC and ROC-AUC evaluate ranking. Brier score and calibration error evaluate probability quality; lower is better for the latter two. "
+    f"Thresholds target at least {comparison.target_recall:.0%} validation recall."
+)
 comparison_rows = [
     {
         "Model": "Logistic regression",
         "PR-AUC": comparison.logistic_pr_auc,
         "ROC-AUC": comparison.logistic_auc,
+        "Threshold": comparison.logistic_decision_threshold,
+        "Precision": comparison.logistic_precision,
         "Recall": comparison.logistic_recall,
         "Brier score": comparison.logistic_brier,
         "Calibration error": comparison.logistic_ece,
@@ -106,13 +127,31 @@ comparison_rows = [
         "Model": "Neural network",
         "PR-AUC": comparison.nn_pr_auc,
         "ROC-AUC": comparison.nn_auc,
+        "Threshold": comparison.nn_decision_threshold,
+        "Precision": comparison.nn_precision,
         "Recall": comparison.nn_recall,
         "Brier score": comparison.nn_brier,
         "Calibration error": comparison.nn_ece,
     },
 ]
-st.dataframe(comparison_rows, use_container_width=True, hide_index=True)
-st.info(f"Preferred model: {comparison.preferred_model.replace('_', ' ').title()}")
+st.dataframe(
+    comparison_rows,
+    use_container_width=True,
+    hide_index=True,
+    column_config={
+        "PR-AUC": st.column_config.NumberColumn(format="%.3f"),
+        "ROC-AUC": st.column_config.NumberColumn(format="%.3f"),
+        "Threshold": st.column_config.NumberColumn(format="%.1%"),
+        "Precision": st.column_config.NumberColumn(format="%.3f"),
+        "Recall": st.column_config.NumberColumn(format="%.3f"),
+        "Brier score": st.column_config.NumberColumn(format="%.3f"),
+        "Calibration error": st.column_config.NumberColumn(format="%.3f"),
+    },
+)
+st.info(
+    f"Preferred model: {comparison.preferred_model.replace('_', ' ').title()} | "
+    f"Calibration: {comparison.calibration_method.replace('_', ' ')}"
+)
 
 chart_columns = st.columns(3)
 predictions = {"logistic_regression": holdout["log_probs"], "neural_net": holdout["nn_probs"]}
@@ -142,10 +181,37 @@ for column, model_name, title in [
     model_prediction = explanation[model_name]
     with column:
         st.markdown(f"#### {title}")
-        st.metric("Bankruptcy probability", f"{model_prediction['probability']:.1%}")
+        st.metric("Calibrated bankruptcy probability", f"{model_prediction['probability']:.1%}")
+        decision_threshold = (
+            comparison.logistic_decision_threshold
+            if model_name == "logistic"
+            else comparison.nn_decision_threshold
+        )
+        predicted_bankruptcy = model_prediction["probability"] >= decision_threshold
+        st.metric("Predicted bankruptcy", "Yes" if predicted_bankruptcy else "No")
         st.metric("Model risk grade", model_prediction["risk_grade"])
         factors = model_prediction["top_factors"]
         st.dataframe(factors, use_container_width=True, hide_index=True)
+
+st.subheader("Confusion matrices at the cost-selected thresholds")
+st.caption("Rows are actual outcomes; columns are model predictions. 0 means no bankruptcy and 1 means bankruptcy.")
+matrix_columns = st.columns(2)
+for column, title, matrix in [
+    (matrix_columns[0], "Logistic regression", comparison.logistic_confusion_matrix),
+    (matrix_columns[1], "Neural network", comparison.nn_confusion_matrix),
+]:
+    with column:
+        st.markdown(f"#### {title}")
+        matrix_table = pd.DataFrame(
+            matrix,
+            index=["Actual no bankruptcy", "Actual bankruptcy"],
+            columns=["Predicted no bankruptcy", "Predicted bankruptcy"],
+        )
+        st.dataframe(
+            matrix_table,
+            use_container_width=True,
+            hide_index=False,
+        )
 
 with st.expander("Dataset feature names"):
     st.write(", ".join(feature_names))

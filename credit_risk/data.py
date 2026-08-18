@@ -68,5 +68,6 @@ def load_polish_bankruptcy_five_year(
     data_dir: str | Path = "data",
     data_path: str | Path | None = None,
 ) -> Tuple[np.ndarray, np.ndarray, List[str]]:
+    """Load the five-year ARFF subset from a path or the local data cache."""
     arff_path = Path(data_path) if data_path else _download_and_extract(Path(data_dir))
     return _parse_arff(arff_path)

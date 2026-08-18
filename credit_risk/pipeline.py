@@ -7,14 +7,23 @@ from typing import Dict
 import numpy as np
 
 from credit_risk.data import load_polish_bankruptcy_five_year
-from credit_risk.evaluation import ComparisonResult, compare_models, grade_from_probability
+from credit_risk.evaluation import (
+    TARGET_RECALL,
+    ComparisonResult,
+    compare_models,
+    grade_from_probability,
+)
 from credit_risk.explanations import prediction_explanations
 from credit_risk.models import TrainedModels
 
 
-def run_training(data_dir: str | Path = "data", data_path: str | Path | None = None) -> Dict[str, object]:
+def run_training(
+    data_dir: str | Path = "data",
+    data_path: str | Path | None = None,
+    target_recall: float = TARGET_RECALL,
+) -> Dict[str, object]:
     X, y, feature_names = load_polish_bankruptcy_five_year(data_dir=data_dir, data_path=data_path)
-    comparison, models, holdout = compare_models(X, y, feature_names)
+    comparison, models, holdout = compare_models(X, y, feature_names, target_recall=target_recall)
     sample_explanation = prediction_explanations(models, holdout["X_test"][0])
 
     return {
@@ -29,7 +38,11 @@ def run_training(data_dir: str | Path = "data", data_path: str | Path | None = N
     }
 
 
-def run_training_json(data_dir: str | Path = "data", data_path: str | Path | None = None) -> str:
+def run_training_json(
+    data_dir: str | Path = "data",
+    data_path: str | Path | None = None,
+    target_recall: float = TARGET_RECALL,
+) -> str:
     def json_default(value: object) -> object:
         if isinstance(value, np.generic):
             return value.item()
@@ -37,11 +50,18 @@ def run_training_json(data_dir: str | Path = "data", data_path: str | Path | Non
             return value.tolist()
         raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
 
-    return json.dumps(run_training(data_dir=data_dir, data_path=data_path), indent=2, default=json_default)
+    return json.dumps(
+        run_training(data_dir=data_dir, data_path=data_path, target_recall=target_recall),
+        indent=2,
+        default=json_default,
+    )
 
 
 __all__ = [
     "ComparisonResult",
+    "FALSE_NEGATIVE_COST",
+    "FALSE_POSITIVE_COST",
+    "TARGET_RECALL",
     "TrainedModels",
     "compare_models",
     "grade_from_probability",

@@ -28,7 +28,12 @@ def prediction_explanations(
     row_imp = imputer.transform(company_row.reshape(1, -1))
     row_scaled = scaler.transform(row_imp)
     logit_contributions = row_scaled[0] * classifier.coef_[0]
-    log_prob = float(logistic.predict_proba(company_row.reshape(1, -1))[0, 1])
+    raw_log_prob = logistic.predict_proba(company_row.reshape(1, -1))[:, 1]
+    log_prob = float(
+        models.logistic_calibrator.transform(raw_log_prob)[0]
+        if models.logistic_calibrator is not None
+        else raw_log_prob[0]
+    )
 
     row_nn = models.nn_preprocessor.scaler.transform(
         models.nn_preprocessor.imputer.transform(company_row.reshape(1, -1))
@@ -38,7 +43,12 @@ def prediction_explanations(
     nn_probability_tensor = torch.sigmoid(models.nn_model(x_tensor))
     nn_probability_tensor.backward()
     nn_contributions = (x_tensor.grad.detach().numpy()[0] * row_nn[0]).astype(float)
-    nn_prob = float(nn_probability_tensor.item())
+    raw_nn_prob = np.array([float(nn_probability_tensor.item())])
+    nn_prob = float(
+        models.nn_calibrator.transform(raw_nn_prob)[0]
+        if models.nn_calibrator is not None
+        else raw_nn_prob[0]
+    )
 
     def top_features(values: np.ndarray) -> List[Dict[str, float | str]]:
         indexes = np.argsort(np.abs(values))[::-1][:top_k]

@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from sklearn.pipeline import Pipeline
 
+from credit_risk.calibration import SigmoidCalibrator
 from credit_risk.neural_network import NNPreprocessor, SmallRiskNet
 
 
@@ -15,6 +16,8 @@ class TrainedModels:
     nn_preprocessor: NNPreprocessor
     nn_model: SmallRiskNet
     feature_names: list[str]
+    logistic_calibrator: SigmoidCalibrator | None = None
+    nn_calibrator: SigmoidCalibrator | None = None
 
 
 # Keep these imports available for callers that used credit_risk.models before
