@@ -115,16 +115,11 @@ So the threshold search tries to minimize:
 5 * false negatives + 1 * false positives
 ```
 
-## Current Results
+## What The Current Results Show
 
-The latest run uses 5,910 companies and 64 ratios. On the held-out test split, the current configuration produced approximately:
+The models are evaluated on companies that were kept separate from training. In general, the neural network has shown a somewhat stronger PR-AUC, while logistic regression remains easier to interpret and is a useful baseline. The difference is not large enough to assume that the neural network will always be better.
 
-| Model | PR-AUC | ROC-AUC | Precision | Recall | Brier | ECE | Threshold |
-|---|---:|---:|---:|---:|---:|---:|---:|
-| Logistic regression | 0.394 | 0.836 | 31.4% | 69.4% | 0.058 | 0.042 | 8.3% |
-| Neural network | 0.421 | 0.849 | 29.5% | 69.4% | 0.053 | 0.033 | 9.7% |
-
-PR-AUC summarizes performance across all thresholds. Precision, recall, and the confusion matrix use the selected threshold. In this run, the neural network has the higher PR-AUC, while logistic regression remains easier to interpret. The results are close enough that this is not proof that the neural network is always better.
+PR-AUC summarizes ranking performance across many thresholds. Precision, recall, and the confusion matrix show what happens at the threshold selected for the project's recall and cost policy. The dashboard and CLI print the current values whenever the models are trained, so the results can change when the data split, configuration, or search settings change.
 
 These results are useful for learning and experimentation, not for real investment decisions. The data is historical and country-specific, the evaluation uses one holdout split, and the project does not yet include temporal or external validation. The test recall may also move between different datasets or time periods.
 
