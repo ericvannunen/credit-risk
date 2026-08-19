@@ -7,8 +7,8 @@ from dataclasses import dataclass
 class LogisticConfig:
     """Settings that control logistic-regression training."""
 
-    c: float = 99.79154698016721
-    class_weight: str | dict[int, float] | None = "balanced"
+    c: float = 10.0
+    class_weight: str | dict[int, float] | None = None
     max_iter: int = 2000
 
 
@@ -16,12 +16,12 @@ class LogisticConfig:
 class NeuralNetworkConfig:
     """Settings that control neural-network architecture and training."""
 
-    hidden_size_1: int = 68
-    hidden_size_2: int = 43
+    hidden_size_1: int = 32
+    hidden_size_2: int = 16
     epochs: int = 150
-    learning_rate: float = 0.0006726315537577054
-    weight_decay: float = 0.00024208715025943105
-    pos_weight_multiplier: float = 0.7155376831147804
+    learning_rate: float = 0.001
+    weight_decay: float = 0.001
+    pos_weight_multiplier: float = 1.0
     random_seed: int = 42
 
 

@@ -54,13 +54,15 @@ Open the local address shown by Streamlit, usually `http://localhost:8501`. The 
 
 ## Search Model Settings
 
-The search command tries a small, readable grid of logistic-regression and neural-network settings:
+The search command uses Optuna to search logistic-regression and neural-network settings:
 
 ```bash
 python -m credit_risk.search --data-path data/5year.arff
 ```
 
-For each candidate, it trains on the training split, calibrates on a separate calibration split, and evaluates on a separate validation split. It selects configurations using the same policy as the main pipeline: minimum recall of 70%, then lowest validation decision cost, with PR-AUC reported as a secondary measure. The test set is not used during the search.
+For each trial, it trains on the training split, calibrates on a separate calibration split, and evaluates on a separate validation split. It selects configurations using the same policy as the main pipeline: minimum recall of 70%, then lowest validation decision cost, with PR-AUC reported as a secondary measure. The test set is not used during the search.
+
+The studies are stored in the root-level SQLite file `optuna_studies.db`. The current database contains separate `logistic_regression` and `neural_network` studies with 200 trials each. Running the search again adds more trials to those existing studies.
 
 The output shows which settings performed best on validation. After reviewing it, copy the chosen model settings into `credit_risk/config.py` and run the normal CLI once for the final test evaluation.
 

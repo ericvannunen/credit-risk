@@ -9,9 +9,15 @@ import streamlit as st
 from sklearn.calibration import calibration_curve
 from sklearn.metrics import precision_recall_curve, roc_curve
 
-from credit_risk.evaluation import FALSE_NEGATIVE_COST, FALSE_POSITIVE_COST, ComparisonResult, compare_models
-from credit_risk.models import TrainedModels
-from credit_risk.pipeline import load_polish_bankruptcy_five_year, prediction_explanations
+from credit_risk.pipeline import (
+    ComparisonResult,
+    TrainedModels,
+    compare_models,
+    FALSE_NEGATIVE_COST,
+    FALSE_POSITIVE_COST,
+    load_polish_bankruptcy_five_year,
+    prediction_explanations,
+)
 
 
 st.set_page_config(page_title="Corporate Credit Risk", page_icon="📊", layout="wide")

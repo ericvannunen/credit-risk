@@ -59,6 +59,8 @@ def run_training_json(
 
 __all__ = [
     "ComparisonResult",
+    "FALSE_NEGATIVE_COST",
+    "FALSE_POSITIVE_COST",
     "TARGET_RECALL",
     "TrainedModels",
     "compare_models",
