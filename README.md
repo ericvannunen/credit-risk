@@ -1,11 +1,14 @@
 # Credit Risk Project
 
-This is a small machine-learning project about predicting whether a Polish company will become bankrupt within one year. It uses the `5year` subset of the UCI Polish Companies Bankruptcy dataset. The 64 input ratios come from the company's fifth observed year, and the target is what happened during the following year.
+This is an end-to-end machine-learning project for estimating whether a Polish company will become bankrupt within one year. It uses the `5year` subset of the UCI Polish Companies Bankruptcy dataset. The 64 input ratios come from the company's fifth observed year, and the target is what happened during the following year.
 
-The project compares two models:
+The project includes a complete modeling and evaluation workflow:
 
 - Logistic regression, which is easier to understand.
 - A small PyTorch neural network, which can learn nonlinear relationships.
+- Optuna-based hyperparameter search for both models.
+- Probability calibration and cost-sensitive threshold selection.
+- A Streamlit dashboard for exploring the data and predictions.
 
 Both models produce bankruptcy probabilities, A-E risk grades, feature explanations, and Yes/No decisions based on a selected threshold.
 
@@ -54,15 +57,13 @@ Open the local address shown by Streamlit, usually `http://localhost:8501`. The 
 
 ## Search Model Settings
 
-The search command uses Optuna to search logistic-regression and neural-network settings:
+Optuna searches logistic-regression and neural-network settings:
 
 ```bash
 python -m credit_risk.search --data-path data/5year.arff
 ```
 
 For each trial, it trains on the training split, calibrates on a separate calibration split, and evaluates on a separate validation split. It selects configurations using the same policy as the main pipeline: minimum recall of 70%, then lowest validation decision cost, with PR-AUC reported as a secondary measure. The test set is not used during the search.
-
-The studies are stored in the root-level SQLite file `optuna_studies.db`. The current database contains separate `logistic_regression` and `neural_network` studies with 200 trials each. Running the search again adds more trials to those existing studies.
 
 The output shows which settings performed best on validation. After reviewing it, copy the chosen model settings into `credit_risk/config.py` and run the normal CLI once for the final test evaluation.
 
