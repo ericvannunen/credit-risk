@@ -24,8 +24,10 @@ Final test-set metrics (one holdout split, ≥70% recall target, cost policy: 5 
 
 | Model | Recall | Precision | PR-AUC | ROC-AUC | Brier | Cal. Error |
 |---|---|---|---|---|---|---|
-| Logistic regression | 0.677 | 0.333 | 0.394 | 0.864 | 0.058 | 0.041 |
-| **Neural network** | **0.694** | **0.339** | **0.449** | **0.856** | **0.050** | **0.023** |
+| Logistic regression | 0.677 ✗ | 0.333 | 0.394 | 0.864 | 0.058 | 0.041 |
+| **Neural network** | **0.694 ✓** | **0.339** | **0.449** | **0.856** | **0.050** | **0.023** |
+
+> ✓ met ≥70% recall target &nbsp; ✗ did not meet ≥70% recall target (still reported for comparison)
 
 **Selected model: Neural network**  
 **Reason:** met ≥70% recall while achieving lower decision cost and higher PR-AUC; also better calibrated (lower Brier score and calibration error).
