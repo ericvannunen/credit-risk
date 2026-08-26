@@ -1,6 +1,8 @@
-# Credit Risk Project
+# Corporate Bankruptcy / Credit-Risk Screening
 
-This is an end-to-end machine-learning project for estimating whether a Polish company will become bankrupt within one year. It uses the `5year` subset of the UCI Polish Companies Bankruptcy dataset. The 64 input ratios come from the company's fifth observed year, and the target is what happened during the following year.
+[![CI](https://github.com/ericvannunen/credit-risk/actions/workflows/ci.yml/badge.svg)](https://github.com/ericvannunen/credit-risk/actions/workflows/ci.yml)
+
+An end-to-end machine-learning project for estimating whether a Polish company will become bankrupt within one year. It uses the `5year` subset of the UCI Polish Companies Bankruptcy dataset. The 64 input ratios come from the company's fifth observed year, and the target is what happened during the following year.
 
 The project includes a complete modeling and evaluation workflow:
 
@@ -11,6 +13,22 @@ The project includes a complete modeling and evaluation workflow:
 - A Streamlit dashboard for exploring the data and predictions.
 
 Both models produce bankruptcy probabilities, A-E risk grades, feature explanations, and Yes/No decisions based on a selected threshold.
+
+## Dashboard
+
+![Streamlit dashboard showing model comparison metrics, precision-recall curve, ROC curve and calibration curve](docs/dashboard.png)
+
+## Results
+
+Final test-set metrics (one holdout split, ≥70% recall target, cost policy: 5 × FN + FP):
+
+| Model | Recall | Precision | PR-AUC | ROC-AUC | Brier | Cal. Error |
+|---|---|---|---|---|---|---|
+| Logistic regression | 0.677 | 0.333 | 0.394 | 0.864 | 0.058 | 0.041 |
+| **Neural network** | **0.694** | **0.339** | **0.449** | **0.856** | **0.050** | **0.023** |
+
+**Selected model: Neural network**  
+**Reason:** met ≥70% recall while achieving lower decision cost and higher PR-AUC; also better calibrated (lower Brier score and calibration error).
 
 ## Setup
 
@@ -118,9 +136,9 @@ So the threshold search tries to minimize:
 
 ## What The Current Results Show
 
-The models are evaluated on companies that were kept separate from training. In general, the neural network has shown a somewhat stronger PR-AUC, while logistic regression remains easier to interpret and is a useful baseline. The difference is not large enough to assume that the neural network will always be better.
+The results table near the top of this README shows the final test-set metrics for the current configuration. The neural network edges ahead of logistic regression on PR-AUC and calibration while meeting the recall target; logistic regression remains a useful, interpretable baseline.
 
-PR-AUC summarizes ranking performance across many thresholds. Precision, recall, and the confusion matrix show what happens at the threshold selected for the project's recall and cost policy. The dashboard and CLI print the current values whenever the models are trained, so the results can change when the data split, configuration, or search settings change.
+PR-AUC summarizes ranking performance across many thresholds. Precision, recall, and the confusion matrix show what happens at the threshold selected for the project's recall and cost policy. The dashboard and CLI will recompute values if the configuration or data split changes.
 
 These results are useful for learning and experimentation, not for real investment decisions. The data is historical and country-specific, the evaluation uses one holdout split, and the project does not yet include temporal or external validation. The test recall may also move between different datasets or time periods.
 
